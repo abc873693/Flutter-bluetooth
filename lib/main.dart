@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_blue/flutter_blue.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 
 void main() => runApp(MyApp());
 
@@ -8,15 +9,17 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Bluetooth',
+      title: '家電遙控',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
       debugShowCheckedModeBanner: false,
-      home: MyHomePage(title: 'Bluetooth C8763'),
+      home: MyHomePage(title: '家電遙控'),
     );
   }
 }
+
+enum Level { close, strong, normal, weak }
 
 class MyHomePage extends StatefulWidget {
   MyHomePage({Key key, this.title}) : super(key: key);
@@ -28,12 +31,13 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
-  FlutterBlue flutterBlue = FlutterBlue.instance;
+  FlutterBluetoothSerial flutterBlue = FlutterBluetoothSerial.instance;
 
   var scanSubscription;
   List<BluetoothDevice> blueDeviceList;
+  BluetoothDevice deviceConnection;
   bool isConnected = false;
-  var deviceConnection;
+  Level level = Level.close;
 
   @override
   void initState() {
@@ -57,106 +61,178 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: <Widget>[
+                FloatingActionButton(
+                    backgroundColor: isConnected
+                        ? level == Level.strong ? Colors.blue : Colors.grey[300]
+                        : Colors.grey,
+                    child: Text(
+                      "強",
+                      style: TextStyle(
+                          color: isConnected && level == Level.strong
+                              ? Colors.white
+                              : Colors.grey[800]),
+                    ),
+                    onPressed: isConnected
+                        ? () async {
+                            await flutterBlue.write('b');
+                            setState(() {
+                              level = Level.strong;
+                            });
+                          }
+                        : null),
+                FloatingActionButton(
+                    backgroundColor: isConnected
+                        ? level == Level.normal ? Colors.blue : Colors.grey[300]
+                        : Colors.grey,
+                    child: Text(
+                      "中",
+                      style: TextStyle(
+                          color: isConnected && level == Level.normal
+                              ? Colors.white
+                              : Colors.grey[800]),
+                    ),
+                    onPressed: isConnected
+                        ? () async {
+                            await flutterBlue.write('c');
+                            setState(() {
+                              level = Level.normal;
+                            });
+                          }
+                        : null),
+                FloatingActionButton(
+                    backgroundColor: isConnected
+                        ? level == Level.weak ? Colors.blue : Colors.grey[300]
+                        : Colors.grey,
+                    child: Text(
+                      "弱",
+                      style: TextStyle(
+                          color: isConnected && level == Level.weak
+                              ? Colors.white
+                              : Colors.grey[800]),
+                    ),
+                    onPressed: isConnected
+                        ? () async {
+                            await flutterBlue.write('d');
+                            setState(() {
+                              level = Level.weak;
+                            });
+                          }
+                        : null),
+              ],
+            ),
+            SizedBox(height: 16),
             RaisedButton(
-                child: Text("開"),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.all(
+                    Radius.circular(30.0),
+                  ),
+                ),
+                padding: EdgeInsets.all(16),
+                color: isConnected
+                    ? level == Level.close ? Colors.blue : Colors.grey[300]
+                    : Colors.grey,
+                child: Text(
+                  "關",
+                  style: TextStyle(
+                      color: isConnected && level == Level.close
+                          ? Colors.white
+                          : Colors.grey[800]),
+                ),
                 onPressed: isConnected
                     ? () async {
-                        await deviceConnection
-                            .writeCharacteristic('a', [0x12, 0x34]);
+                        await flutterBlue.write('a');
+                        setState(() {
+                          level = Level.close;
+                        });
                       }
                     : null),
-            RaisedButton(
-                child: Text("關"),
-                onPressed: isConnected
-                    ? () async {
-                        await deviceConnection
-                            .writeCharacteristic('b', [0x12, 0x34]);
-                      }
-                    : null),
-            RaisedButton(
-                child: Text("中斷連線"),
-                onPressed: isConnected
-                    ? () {
-                        deviceConnection.cancel();
-                      }
-                    : null),
-            RaisedButton(
-                child: Text("重新掃描"),
-                onPressed: () {
-                  scanSubscription.cancel();
-                  initBluetooth();
-                  setState(() {
-                    isConnected = false;
-                  });
-                })
+            SizedBox(height: 16),
+            Builder(builder: (BuildContext context) {
+              return RaisedButton(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.all(
+                      Radius.circular(30.0),
+                    ),
+                  ),
+                  child: Text(
+                    "中斷連線",
+                  ),
+                  padding: EdgeInsets.all(16),
+                  onPressed: isConnected
+                      ? () async {
+                          await flutterBlue.disconnect();
+                          setState(() {
+                            isConnected = false;
+                          });
+                          showMessage(context, "中斷成功");
+                        }
+                      : null);
+            }),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          List<Widget> list = [];
-          for (int i = 0; i < blueDeviceList.length; i++) {
-            list.add(_dialogItem(i, blueDeviceList[i]));
-          }
-          showDialog<int>(
-              context: context,
-              builder: (BuildContext context) =>
-                  SimpleDialog(title: Text("請選擇設備"), children: list))
-              .then<void>((int position) {
-            if (position != null) {
-              deviceConnection = flutterBlue
-                  .connect(blueDeviceList[position])
-                  .listen((s) {
-                if (s == BluetoothDeviceState.connected) {
-                  setState(() {
-                    isConnected = true;
-                  });
-                  showMessage("連接成功");
-                } else if (s == BluetoothDeviceState.disconnected)
-                  setState(() {
-                    isConnected = false;
-                  });
-              });
+      floatingActionButton: Builder(builder: (BuildContext context) {
+        return FloatingActionButton(
+          onPressed: () {
+            List<Widget> list = [];
+            for (int i = 0; i < blueDeviceList.length; i++) {
+              list.add(_dialogItem(i, blueDeviceList[i]));
             }
-          });
-        },
-        tooltip: 'bluetooth select',
-        child: Icon(Icons.bluetooth_audio),
-      ),
+            showDialog<int>(
+                    context: context,
+                    builder: (BuildContext _) =>
+                        SimpleDialog(title: Text("請選擇設備"), children: list))
+                .then<void>((int position) async {
+              if (position != null) {
+                deviceConnection = blueDeviceList[position];
+                flutterBlue.connect(deviceConnection).catchError((error) {
+                  //showMessage(context, "連接失敗");
+                });
+                setState(() {
+                  isConnected = true;
+                });
+                showMessage(context, "連接成功");
+              }
+            });
+          },
+          tooltip: 'bluetooth select',
+          child: Icon(Icons.bluetooth_audio),
+        );
+      }),
     );
   }
 
-  void initBluetooth() {
+  Color get textColor => isConnected ? Colors.white : Colors.grey[800];
+
+  void initBluetooth() async {
     blueDeviceList = [];
-    scanSubscription = flutterBlue.scan().listen((scanResult) async {
-      var index = -1;
-      for (var i = 0; i < blueDeviceList.length; i++) {
-        if (blueDeviceList[i].id.id == scanResult.device.id.id) {
-          blueDeviceList[i] = scanResult.device;
-          index = i;
-        }
+    List<BluetoothDevice> devices = [];
+
+    try {
+      blueDeviceList = await flutterBlue.getBondedDevices();
+      for (var i in devices) {
+        blueDeviceList.add(i);
       }
-      if (index == -1) {
-        var state = await scanResult.device.state;
-        if (state == BluetoothDeviceState.disconnected) {
-          blueDeviceList.add(scanResult.device);
-        }
-      }
-    });
+    } on PlatformException {
+      // TODO - Error
+    }
   }
 
   SimpleDialogOption _dialogItem(int index, BluetoothDevice device) {
     return SimpleDialogOption(
         child: ListTile(
           title: Text(device.name),
-          subtitle: Text("${device.id}"),
+          subtitle: Text("${device.address}"),
         ),
         onPressed: () {
           Navigator.pop(context, index);
         });
   }
 
-  showMessage(String text) {
+  showMessage(BuildContext context, String text) {
     final snackBar = SnackBar(content: Text(text));
     Scaffold.of(context).showSnackBar(snackBar);
   }

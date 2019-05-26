@@ -3,12 +3,12 @@
 //
 
 #import "GeneratedPluginRegistrant.h"
-#import <flutter_blue/FlutterBluePlugin.h>
+#import <flutter_bluetooth_serial/FlutterBluetoothSerialPlugin.h>
 
 @implementation GeneratedPluginRegistrant
 
 + (void)registerWithRegistry:(NSObject<FlutterPluginRegistry>*)registry {
-  [FlutterBluePlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterBluePlugin"]];
+  [FlutterBluetoothSerialPlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterBluetoothSerialPlugin"]];
 }
 
 @end
